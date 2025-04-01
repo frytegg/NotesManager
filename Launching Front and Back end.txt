@@ -1,0 +1,2 @@
+To launch back-end : cd NotesManager.API; dotnet run
+To launch front-end : cd notes-manager-client; npm run dev
