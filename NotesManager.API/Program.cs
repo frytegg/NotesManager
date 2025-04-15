@@ -53,6 +53,7 @@ builder.Services.AddAuthentication(options =>
 
 // Configure Services
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<INotesService, NotesService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -67,10 +68,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
-
 app.UseCors("AllowAll");
-
 app.UseAuthentication();
 app.UseAuthorization();
 

@@ -34,54 +34,78 @@ namespace NotesManager.API.Services
 
         public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
         {
-            _logger.LogInformation("Starting registration process");
-            
-            var existingUser = await _userManager.FindByEmailAsync(registerDto.Email);
-            if (existingUser != null)
+            try
             {
-                _logger.LogWarning($"Registration failed: Email {registerDto.Email} is already registered");
-                throw new Exception("This email is already registered");
+                _logger.LogInformation($"Début du processus d'enregistrement pour l'email: {registerDto.Email}");
+                _logger.LogInformation($"Données d'enregistrement: FirstName={registerDto.FirstName}, LastName={registerDto.LastName}");
+                
+                var existingUser = await _userManager.FindByEmailAsync(registerDto.Email);
+                if (existingUser != null)
+                {
+                    _logger.LogWarning($"Échec de l'enregistrement: L'email {registerDto.Email} est déjà enregistré");
+                    throw new Exception("Cet email est déjà enregistré");
+                }
+
+                var user = new ApplicationUser
+                {
+                    UserName = registerDto.Email,
+                    Email = registerDto.Email,
+                    FirstName = registerDto.FirstName,
+                    LastName = registerDto.LastName,
+                    Description = string.Empty
+                };
+
+                _logger.LogInformation("Création de l'utilisateur dans la base de données...");
+                var result = await _userManager.CreateAsync(user, registerDto.Password);
+                
+                if (!result.Succeeded)
+                {
+                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
+                    _logger.LogError($"Échec de l'enregistrement avec les erreurs: {errors}");
+                    throw new Exception($"Échec de l'enregistrement: {errors}");
+                }
+
+                _logger.LogInformation($"Utilisateur enregistré avec succès: {registerDto.Email}");
+                return await GenerateAuthResponseDtoAsync(user);
             }
-
-            var user = new ApplicationUser
+            catch (Exception ex)
             {
-                UserName = registerDto.Email,
-                Email = registerDto.Email,
-                FirstName = registerDto.FirstName,
-                LastName = registerDto.LastName
-            };
-
-            var result = await _userManager.CreateAsync(user, registerDto.Password);
-            if (!result.Succeeded)
-            {
-                _logger.LogError($"Registration failed: {string.Join(", ", result.Errors.Select(e => e.Description))}");
-                throw new Exception($"Registration failed: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+                _logger.LogError($"Erreur lors de l'enregistrement: {ex.Message}");
+                throw;
             }
-
-            _logger.LogInformation($"User registered successfully: {registerDto.Email}");
-            return await GenerateAuthResponseDtoAsync(user);
         }
 
         public async Task<AuthResponseDto> LoginAsync(LoginDto model)
         {
-            _logger.LogInformation($"Starting login for email: {model.Email}");
-            
-            var user = await _userManager.FindByEmailAsync(model.Email);
-            if (user == null)
+            try
             {
-                _logger.LogError($"Login failed: User not found with email {model.Email}");
-                throw new Exception("Invalid credentials");
-            }
+                _logger.LogInformation($"Tentative de connexion pour l'email: {model.Email}");
+                
+                // Utiliser le nom d'utilisateur normalisé
+                var normalizedEmail = model.Email.ToUpper();
+                var user = await _userManager.FindByEmailAsync(normalizedEmail);
+                
+                if (user == null)
+                {
+                    _logger.LogWarning($"Échec de la connexion: Utilisateur non trouvé avec l'email {model.Email}");
+                    throw new Exception("Identifiants invalides");
+                }
 
-            var isPasswordValid = await _userManager.CheckPasswordAsync(user, model.Password);
-            if (!isPasswordValid)
+                var isPasswordValid = await _userManager.CheckPasswordAsync(user, model.Password);
+                if (!isPasswordValid)
+                {
+                    _logger.LogWarning($"Échec de la connexion: Mot de passe invalide pour l'utilisateur {model.Email}");
+                    throw new Exception("Identifiants invalides");
+                }
+
+                _logger.LogInformation($"Utilisateur connecté avec succès: {model.Email}");
+                return await GenerateAuthResponseDtoAsync(user);
+            }
+            catch (Exception ex)
             {
-                _logger.LogError($"Login failed: Invalid password for user {model.Email}");
-                throw new Exception("Invalid credentials");
+                _logger.LogError($"Erreur lors de la connexion: {ex.Message}");
+                throw;
             }
-
-            _logger.LogInformation($"User logged in successfully with ID: {user.Id}");
-            return await GenerateAuthResponseDtoAsync(user);
         }
 
         private async Task<AuthResponseDto> GenerateAuthResponseDtoAsync(ApplicationUser user)

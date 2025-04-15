@@ -5,6 +5,7 @@ using NotesManager.API.DTOs;
 using NotesManager.API.Models;
 using NotesManager.API.Services;
 using System.Security.Claims;
+using Microsoft.Extensions.Logging;
 
 namespace NotesManager.API.Controllers
 {
@@ -14,11 +15,13 @@ namespace NotesManager.API.Controllers
     {
         private readonly IAuthService _authService;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly ILogger<AuthController> _logger;
 
-        public AuthController(IAuthService authService, UserManager<ApplicationUser> userManager)
+        public AuthController(IAuthService authService, UserManager<ApplicationUser> userManager, ILogger<AuthController> logger)
         {
             _authService = authService;
             _userManager = userManager;
+            _logger = logger;
         }
 
         [HttpPost("register")]
@@ -26,11 +29,25 @@ namespace NotesManager.API.Controllers
         {
             try
             {
+                _logger.LogInformation($"Tentative d'enregistrement pour l'email: {model.Email}");
+                _logger.LogInformation($"Données d'enregistrement: FirstName={model.FirstName}, LastName={model.LastName}");
+
+                if (!ModelState.IsValid)
+                {
+                    var errors = ModelState.Values
+                        .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage);
+                    _logger.LogWarning($"Validation échouée: {string.Join(", ", errors)}");
+                    return BadRequest(new { message = string.Join(", ", errors) });
+                }
+
                 var result = await _authService.RegisterAsync(model);
+                _logger.LogInformation($"Enregistrement réussi pour l'email: {model.Email}");
                 return Ok(result);
             }
             catch (Exception ex)
             {
+                _logger.LogError($"Erreur lors de l'enregistrement: {ex.Message}");
                 return BadRequest(new { message = ex.Message });
             }
         }
